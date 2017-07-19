@@ -8,6 +8,10 @@ This is an ansible project built to allow you to install monit to add process pl
 
 [Monit-Add-Process](https://github.com/hertzigger/monit-add-process)
 
+## Supported OS
+
+centos
+
 ## Example Usage
 
 ### Playbook
