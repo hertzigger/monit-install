@@ -1,0 +1,3 @@
+---
+monit_install_open_ports:
+  - 2812

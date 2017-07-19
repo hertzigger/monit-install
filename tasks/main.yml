@@ -1,0 +1,122 @@
+---
+- name: install monit
+  yum:
+    name: monit
+    state: present
+  when: monit_install_run
+
+- name: install pyopenssl
+  command: pip install pyopenssl
+
+- name: generate pem file
+  command: "openssl req -new -x509 -days 3650 -subj '/C=GB/ST=England/L=Wakefield/O=The Server Guys Ltd/OU=Org/CN={{ inventory_hostname }}' -nodes -out {{ monit_install_pem_location }} -keyout {{ monit_install_pem_location }}"
+
+- name: set permissions of pem file
+  file:
+    path: "{{ monit_install_pem_location }}"
+    owner: "root"
+    group: "root"
+    mode: 0700
+
+- name: "copy monitrc"
+  template:
+    src: "monitrc"
+    dest: "/etc/monitrc"
+    owner: "root"
+    group: "root"
+    mode: 0700
+  when: monit_install_run|bool
+  notify: reload monit
+
+- name: "copy monit-kill-process script"
+  template:
+    src: "monit-kill-process.sh"
+    dest: "/usr/bin/monit-kill-process.sh"
+    owner: "root"
+    group: "root"
+    mode: 0700
+  when: monit_install_run|bool
+  notify: reload monit
+
+- name: enabling monit at startup
+  service:
+    name: monit
+    state: started
+    enabled: yes
+  when: monit_install_run
+
+- include_role:
+    name: monit-add-process
+  vars:
+    monit_add_process_name: 'ssh'
+    monit_add_process_type: 'process'
+    monit_add_process_with: "pidfile /var/run/sshd.pid"
+    monit_add_process_start_program:
+      command: '/usr/bin/systemctl start sshd.service'
+    monit_add_process_stop_program:
+      command: '/usr/bin/systemctl stop sshd.service'
+    monit_add_process_check_options:
+      - test: 'FAILED'
+        action: 'RESTART'
+        checks:
+          - 'port 22 protocol ssh'
+      - test: 'DOES NOT EXIST'
+        action: 'RESTART'
+      - test: '5 restarts'
+        action: 'alert'
+        checks:
+          - 'within 5 cycles'
+  when: monit_install_run
+
+- include_role:
+    name: monit-add-process
+  vars:
+    monit_add_process_name: 'storage'
+    monit_add_process_type: 'device'
+    monit_add_process_with: "path /"
+    monit_add_process_check_options:
+      - test: 'SPACE'
+        action: 'ALERT'
+        checks:
+          - 'usage > 80%'
+  when: monit_install_run
+
+- include_role:
+    name: monit-add-process
+  vars:
+    monit_add_process_name: 'syslogd'
+    monit_add_process_type: 'process'
+    monit_add_process_with: "pidfile /var/run/syslogd.pid"
+    monit_add_process_start_program:
+      command: '/usr/bin/systemctl start rsyslog.service'
+    monit_add_process_stop_program:
+      command: '/usr/bin/systemctl stop rsyslog.service'
+    monit_add_process_check_options:
+      - test: 'DOES NOT EXIST'
+        action: 'RESTART'
+      - test: '5 restarts'
+        action: 'alert'
+        checks:
+          - 'within 5 cycles'
+  when: monit_install_run
+
+- name: check for first firewall rule
+  command: iptables -C INPUT -p tcp --dport {{ monit_install_open_ports[0] }} -j ACCEPT -s {{ firewall_internal_sources[1] }}
+  ignore_errors: yes
+  register: monit_install_firewall_rule
+  when: monit_install_run
+
+- name: open firewall ports
+  command: iptables -I INPUT -p tcp --dport {{ item[0] }} -j ACCEPT -s {{ item[1] }}
+  with_nested:
+      - "{{ monit_install_open_ports }}"
+      - "{{ firewall_internal_sources }}"
+  when: monit_install_run and monit_install_firewall_rule.rc != 0
+
+- name: save iptables
+  command: iptables-save
+  when: monit_install_run|bool and monit_install_firewall_rule.rc != 0
+
+- name: dont run monit install again
+  set_fact:
+    monit_install_run: false
