@@ -3,3 +3,5 @@ monit_install_run: true
 monit_install_pem_location: /etc/monit.pem
 monit_install_username: admin
 monit_install_password: password
+monit_install_smtp_username: username
+monit_install_smtp_password: password

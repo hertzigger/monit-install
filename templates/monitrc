@@ -109,7 +109,7 @@ set mail-format {
             Monit
 }
 set mailserver smtp.mailgun.org port 587
-  username postmaster@dragonshard.net password "f628193a8d82bc99d22be45b989c07bd"
+  username {{ monit_install_smtp_username }} password "{{ monit_install_smtp_password }}"
   using TLSV1 with timeout 30 seconds
 set alert null
 ## --8<--
