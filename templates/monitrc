@@ -111,7 +111,7 @@ set mail-format {
 set mailserver smtp.mailgun.org port 587
   username {{ monit_install_smtp_username }} password "{{ monit_install_smtp_password }}"
   using TLSV1 with timeout 30 seconds
-set alert null
+set alert {{ monit_install_alert_address }}
 ## --8<--
 ##
 ## You can override this message format or parts of it, such as subject
